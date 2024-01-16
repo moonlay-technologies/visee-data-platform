@@ -1,0 +1,2 @@
+-- Dummy
+select 'dummy'
