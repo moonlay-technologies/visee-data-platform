@@ -8,7 +8,16 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 from airflow.providers.postgres.operators.postgres import PostgresOperator
 from airflow.operators.sql import SQLCheckOperator
+from dotenv import load_dotenv
+import os
 
+
+load_dotenv('jobs/files/envi.env')
+
+aws_key_id = os.getenv('aws_key_id')
+aws_seccret_key = os.getenv('aws_seccret_key')
+aws_region_name = os.getenv('aws_region_name')
+postgres_url_db = os.getenv('postgres_url_db')
 
 args = {
     'owner': 'Bun',
@@ -26,13 +35,13 @@ dag = DAG(
 )
 
 table_name = 'visitor_raw'
-database_url = 'postgresql+psycopg2://postgres:P%40ssw0rd123@host.docker.internal:5432/postgres'
+database_url=postgres_url_db
 
 def dynamodb_to_postgres():
     dynamodb = boto3.resource('dynamodb',
-                           aws_access_key_id='AKIAT7CSIS7IAVIA7FFJ',
-                           aws_secret_access_key='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',
-                           region_name='us-east-1'
+                           aws_access_key_id=aws_key_id,
+                           aws_secret_access_key=aws_seccret_key,
+                           region_name=aws_region_name
                         #    endpoint_url='http://172.19.0.2:8000'
                            )
     
