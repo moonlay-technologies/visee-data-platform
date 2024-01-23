@@ -7,11 +7,14 @@
     , zone_id 
     , object_id 
     , concat(gender,' - ',age) as gender_age
-    , created_at 
-    , updated_at 
+    , created_at::TIMESTAMP created_at 
+    , updated_at::TIMESTAMP updated_at 
     , cast (confidence as float) as confidence 
     from visitor_raw vr 
-    --where object_id in (6969, 7171,8888)
+   where 
+    created_at::TIMESTAMP >= %(filter_start)s::TIMESTAMP
+    AND
+    updated_at::TIMESTAMP <= %(filter_end)s::TIMESTAMP
     )
     , count_mode as ( --get mode of gender_age from each object_id
     select 
@@ -192,8 +195,8 @@
     , session_id 
     , zone_id 
     , object_id 
-    , min(created_at) as to_inside
-    , max(updated_at) as to_outside
+    , min(created_at) as "in"
+    , max(updated_at) as "out"
     from raw_data
     group by 
     client_id 
@@ -205,18 +208,20 @@
     , final_query AS (
         SELECT 
             -- row_number() OVER(ORDER BY fg.client_id, fg.device_id, fg.session_id, fg.object_id) AS id,
-            fg.client_id,
-            fg.device_id,
-            fg.session_id,
-            fg.object_id,
-            fg.zone_id,
-            date(gt.to_inside) AS date,
-            gt.to_inside,
-            gt.to_outside,
-            (gt.to_outside - gt.to_inside) AS duration,
-            split_part(gender_age, ' - ', 1) AS gender,
-            split_part(gender_age, ' - ', 2) AS age,
-            fg.confidence
+            %(filter_start)s ::TIMESTAMP as created_at
+            , %(filter_end)s ::TIMESTAMP as updated_at
+            , fg.client_id
+            , fg.device_id
+            , fg.session_id
+            , fg.object_id
+            , fg.zone_id
+            , date(gt."in") AS "date"
+            , gt."in"
+            , gt."out"
+            , (gt."out" - gt."in") AS duration
+            , split_part(gender_age, ' - ', 1) AS gender
+            , split_part(gender_age, ' - ', 2) AS age
+            , fg.confidence
         FROM final_gender fg
         join get_time gt on fg.client_id = gt.client_id
             and fg.device_id = gt.device_id
@@ -224,24 +229,27 @@
             and fg.zone_id = gt.zone_id
             and fg.object_id = gt.object_id
     )
-    INSERT INTO visitor (client_id, device_id, session_id, object_id, zone_id, date, to_inside, to_outside, duration, gender, age, confidence)
-    SELECT 
-        client_id
+    INSERT INTO visitor (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, "date", "in", "out", duration, gender, age, confidence)
+    SELECT
+        created_at 
+        ,updated_at
+        ,client_id
         ,device_id
         ,session_id
         ,object_id
         ,zone_id
-        ,date
-        ,to_inside
-        ,to_outside
+        ,"date"
+        ,"in"
+        ,"out"
         ,duration
         ,gender
         ,age
         ,confidence
     FROM final_query
-    ON CONFLICT on constraint visitor_unique
-    DO UPDATE SET 
-        to_outside = EXCLUDED.to_outside
+    ON CONFLICT on constraint visitor_conflict
+    DO UPDATE SET
+        updated_at = EXCLUDED.updated_at
+        ,"out" = EXCLUDED."out"
         ,duration = EXCLUDED.duration
         ,gender = EXCLUDED.gender
         ,age = EXCLUDED.age

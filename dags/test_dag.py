@@ -7,8 +7,9 @@ from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.bash import BashOperator
 from airflow.models import Variable
 import pendulum
+from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
-import pandas as pd
 import logging
 
 log = logging.getLogger(__name__)
@@ -47,24 +48,64 @@ end = DummyOperator(
     dag=dag
 )
 
-def python_function(date_params, **kwargs):
-    print(f"This Python task uses params {date_params}")
+bash_task = BashOperator(
+    task_id='delay',
+    bash_command='sleep 3',
+    dag=dag
+)
+
+def python_function(ti, **kwargs):
+    get_execute_times = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+    get_time = datetime.strptime(get_execute_times, "%Y-%m-%d %H:%M:%S")
+
+    filter_start = (get_time - timedelta(minutes=5)).replace(second=1, microsecond=1)
+    filter_end = (get_time).replace(second=0, microsecond=0)
+
+    log.info(f"filter_start: {filter_start.strftime('%Y-%m-%d %H:%M:%S')}")
+    log.info(f"filter_end: {filter_end.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    ti.xcom_push(key='filter_start', value=filter_start.strftime('%Y-%m-%dT%H:%M:%SZ'))
+    ti.xcom_push(key='filter_end', value=filter_end.strftime('%Y-%m-%dT%H:%M:%SZ'))
+
+    Variable.set('filter_start', filter_start.strftime('%Y-%m-%dT%H:%M:%SZ'))
+    Variable.set('filter_end', filter_end.strftime('%Y-%m-%dT%H:%M:%SZ'))
 
 python_task = PythonOperator(
-    task_id='using_python_task',
+    task_id='python_task',
     python_callable=python_function,
-    provide_context=True,
-    op_kwargs={'date_params': date_params},
+    provide_context=True,  # This provides 'ti' to the function
     dag=dag
 )
 
-bash_task = BashOperator(
-    task_id='using_bash_task',
-    bash_command='echo "This Bash task uses params {}"'.format(date_params),
+# query_task = PostgresOperator(
+#     task_id='postgres_task',
+#     postgres_conn_id='visee_postgres',
+#     sql="""
+#         SELECT
+#             %(filter_start)s AT TIME ZONE 'Asia/Bangkok' as field_1,
+#             %(filter_end)s AT TIME ZONE 'Asia/Bangkok' as field_2,
+#             id
+#         FROM bak_visitor
+#         LIMIT 5;
+#     """,
+#     parameters={
+#         'filter_start': '{{ ti.xcom_pull(task_ids="python_task", key="filter_start") }}',
+#         'filter_end': '{{ ti.xcom_pull(task_ids="python_task", key="filter_end") }}'
+#     },
+#     dag=dag
+# )
+
+query_operator = SQLExecuteQueryOperator(
+    task_id='sql_task',
+    # conn_id=visee_postgres,
+    conn_id='postgre_local',
+    sql='sql/to_monitor_peak.sql',
+    parameters={
+        'filter_start': '{{ ti.xcom_pull(task_ids="python_task", key="filter_start") }}',
+        'filter_end': '{{ ti.xcom_pull(task_ids="python_task", key="filter_end") }}'
+    },
     dag=dag
 )
 
-
-
-start >> python_task >> bash_task >> end
-# start >> bash_task >> end
+# start >> bash_task >> python_task >> query_task >> end
+start >> bash_task >> python_task >> query_operator >> end
