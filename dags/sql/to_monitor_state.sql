@@ -9,7 +9,10 @@ client_id
 , object_id 
 , duration 
 from visitor v
---where session_id =12
+-- where 
+-- updated_at >= %(filter_start)s::TIMESTAMPTZ
+-- and 
+-- updated_at <= %(filter_end)s ::TIMESTAMPTZ
 )
 , get_count as (
 select 
@@ -44,20 +47,22 @@ select
 current_timestamp as created_at 
 , current_timestamp as updated_at 
 , gc.client_id
-, 'ABC' as client_name
+, mc.name as client_name
 , gc.zone_id
-, 'Zone' as zone_name
+, mz.zone_name as zone_name
 , gc.gender
 , gc.age
-, gc.count_visitor as counts
+, gc.count_visitor as count
 , gdt.avg_dwelling_time
 from get_count gc 
 join get_dwell_time gdt on gc.client_id = gdt.client_id
 	and gc.zone_id = gdt.zone_id
 	and gc.gender = gdt.gender
 	and gc.age = gdt.age
+left join master_client mc on gc.client_id = mc.id
+left join master_zone mz on gc.zone_id = mz.id
 )
-insert into monitor_state  (created_at,updated_at,client_id,client_name,zone_id,zone_name,gender,age,counts, avg_dwelling_time)
+insert into monitor_state  (created_at,updated_at,client_id,client_name,zone_id,zone_name,gender,age,count, avg_dwelling_time)
 select 
 created_at 
 , updated_at
@@ -67,11 +72,11 @@ created_at
 , zone_name
 , gender 
 , age 
-, counts
+, count
 , avg_dwelling_time
 from final_result
-on conflict on constraint monitor_state_uniqe
-do update set 
-	updated_at = excluded.updated_at
-	, counts = excluded.counts
-	, avg_dwelling_time = excluded.avg_dwelling_time
+on CONFLICT on constraint monitor_state_conflict
+DO UPDATE SET
+	updated_at = EXCLUDED.updated_at
+	, count = EXCLUDED.count
+	, avg_dwelling_time = EXCLUDED.avg_dwelling_time

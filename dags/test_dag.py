@@ -55,20 +55,27 @@ bash_task = BashOperator(
 )
 
 def python_function(ti, **kwargs):
-    get_execute_times = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
-    get_time = datetime.strptime(get_execute_times, "%Y-%m-%d %H:%M:%S")
+    get_execute_times = datetime.now(local_tz)
+    get_formated = get_execute_times.strftime("%Y-%m-%d %H:%M:%S.%f%z")
+    
+    get_offset = get_execute_times.strftime("%z")
 
-    filter_start = (get_time - timedelta(minutes=5)).replace(second=1, microsecond=1)
-    filter_end = (get_time).replace(second=0, microsecond=0)
+    formated_times = datetime.strptime(get_formated, "%Y-%m-%d %H:%M:%S.%f%z")
 
-    log.info(f"filter_start: {filter_start.strftime('%Y-%m-%d %H:%M:%S')}")
-    log.info(f"filter_end: {filter_end.strftime('%Y-%m-%d %H:%M:%S')}")
+    filter_start = (formated_times - timedelta(minutes=5)).replace(second=1, microsecond=1)
+    filter_end = formated_times.replace(second=0, microsecond=0)
 
-    ti.xcom_push(key='filter_start', value=filter_start.strftime('%Y-%m-%dT%H:%M:%SZ'))
-    ti.xcom_push(key='filter_end', value=filter_end.strftime('%Y-%m-%dT%H:%M:%SZ'))
+    ti.xcom_push(key='filter_start', value=filter_start.strftime("%Y-%m-%d %H:%M:%S.%f") + filter_start.strftime("%z")[:3] + ':' + filter_start.strftime("%z")[3:])
+    ti.xcom_push(key='filter_end', value=filter_end.strftime("%Y-%m-%d %H:%M:%S.%f") + filter_end.strftime("%z")[:3] + ':' + filter_end.strftime("%z")[3:])
 
-    Variable.set('filter_start', filter_start.strftime('%Y-%m-%dT%H:%M:%SZ'))
-    Variable.set('filter_end', filter_end.strftime('%Y-%m-%dT%H:%M:%SZ'))
+    # filter_start = (get_time - timedelta(minutes=5)).replace(second=1, microsecond=1)
+    # filter_end = (get_time).replace(second=0, microsecond=0)
+
+    # log.info(f"filter_start: {filter_start.strftime('%Y-%m-%dT%H:%M:%S.%f%z')}")
+    # log.info(f"filter_end: {filter_end.strftime('%Y-%m-%dT%H:%M:%S.%f%z')}")
+
+    # ti.xcom_push(key='filter_start', value=filter_start.strftime('%Y-%m-%dT%H:%M:%S.%f%z'))
+    # ti.xcom_push(key='filter_end', value=filter_end.strftime('%Y-%m-%dT%H:%M:%S.%f%z'))
 
 python_task = PythonOperator(
     task_id='python_task',

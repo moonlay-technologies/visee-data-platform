@@ -6,25 +6,25 @@
     , session_id 
     , zone_id 
     , object_id 
-    , concat(gender,' - ',age) as gender_age
-    , created_at::TIMESTAMP created_at 
-    , updated_at::TIMESTAMP updated_at 
+    , gender
+    , created_at::TIMESTAMPTZ created_at 
+    , updated_at::TIMESTAMPTZ updated_at 
     , cast (confidence as float) as confidence 
     from visitor_raw vr 
    where 
-    created_at::TIMESTAMP >= %(filter_start)s::TIMESTAMP
-    AND
-    updated_at::TIMESTAMP <= %(filter_end)s::TIMESTAMP
+    (created_at::TIMESTAMPTZ >=  %(filter_start)s::timestamptz
+    AND 
+    created_at::TIMESTAMPTZ <= %(filter_end)s::timestamptz)
     )
-    , count_mode as ( --get mode of gender_age from each object_id
+    , count_mode as ( --get mode of gender from each object_id
     select 
     client_id 
     , device_id 
     , session_id 
     , zone_id 
     , object_id 
-    , gender_age
-    , count(gender_age) as mode_count
+    , gender
+    , count(gender) as mode_count
     from raw_data
     group by 
     client_id 
@@ -32,16 +32,16 @@
     , session_id 
     , zone_id 
     , object_id 
-    , gender_age
+    , gender
     )
-    , get_best_mode as ( --get the best mode gender_age from each object_id
+    , get_best_mode as ( --get the best mode gender from each object_id
     select 
     client_id 
     , device_id 
     , session_id 
     , zone_id 
     , object_id 
-    , gender_age
+    , gender
     , max(mode_count) as best_mode
     from count_mode
     where mode_count > 1
@@ -51,9 +51,9 @@
     , session_id 
     , zone_id 
     , object_id 
-    , gender_age
+    , gender
     )
-    , elimination1 as ( --elimination 1 to get just 1 best mode gender_age from each object_id
+    , elimination1 as ( --elimination 1 to get just 1 best mode gender from each object_id
     select 
     client_id 
     , device_id 
@@ -72,14 +72,14 @@
     , zone_id 
     , object_id 
     )
-    , gender_by_mode as ( -- final gender_age by mode
+    , gender_by_mode as ( -- final gender by mode
     select 
     gbm.client_id 
     , gbm.device_id 
     , gbm.session_id 
     , gbm.zone_id
     , gbm.object_id
-    , gbm.gender_age
+    , gbm.gender
     , e1.flag
     , 'Gender by Mode' as get_by
     from elimination1 e1
@@ -97,7 +97,7 @@
     , rd.session_id
     , rd.zone_id
     , rd.object_id
-    , rd.gender_age
+    , rd.gender
     , stddev(rd.confidence) as stdv_conf
     from get_best_mode gm 
     join elimination1 e1 on gm.client_id = e1.client_id
@@ -110,7 +110,7 @@
         and gm.session_id = rd.session_id
         and gm.zone_id = rd.zone_id
         and gm.object_id = rd.object_id
-        and gm.gender_age = rd.gender_age
+        and gm.gender = rd.gender
     where e1.flag = 'Incorrect'
     group by 
     rd.client_id
@@ -118,7 +118,7 @@
     , rd.session_id
     , rd.zone_id
     , rd.object_id
-    , rd.gender_age
+    , rd.gender
     )
     , final_stdv as (
     select 
@@ -143,7 +143,7 @@
     , gs.session_id
     , gs.zone_id
     , gs.object_id
-    , gs.gender_age
+    , gs.gender
     --, fst.conf_final
     , 'Correct' as flag
     , 'Gender by STDV' as get_by
@@ -169,7 +169,7 @@
     , rd.session_id 
     , rd.zone_id
     , rd.object_id
-    , rd.gender_age
+    , rd.gender
     , ut.get_by
     , max(rd.confidence) as confidence 
     from union_tab ut
@@ -178,38 +178,42 @@
         and ut.session_id = rd.session_id
         and ut.zone_id = rd.zone_id
         and ut.object_id = rd.object_id
-        and ut.gender_age = rd.gender_age
+        and ut.gender = rd.gender
     group by 
     rd.client_id 
     , rd.device_id 
     , rd.session_id
     , rd.zone_id
     , rd.object_id
-    , rd.gender_age
+    , rd.gender
     , ut.get_by
     )
-    , get_time as (
+    , get_time as ( --update max(created_at) as "out"  
     select 
-    client_id 
-    , device_id 
-    , session_id 
-    , zone_id 
-    , object_id 
-    , min(created_at) as "in"
-    , max(updated_at) as "out"
-    from raw_data
+    rw.client_id 
+    , rw.device_id 
+    , rw.session_id 
+    , rw.zone_id 
+    , rw.object_id 
+    , min(case when v."in" is not null then v."in" else rw.created_at end) as "in"
+    , max(rw.created_at) as "out"
+    from raw_data rw 
+    left join visitor v on rw.client_id = v.client_id 
+    	and rw.device_id = v.device_id 
+    	and rw.session_id = v.session_id 
+    	and rw.zone_id = v.zone_id 
+    	and rw.object_id = v.object_id 
     group by 
-    client_id 
-    , device_id 
-    , session_id 
-    , zone_id 
-    , object_id 
+    rw.client_id 
+    , rw.device_id 
+    , rw.session_id 
+    , rw.zone_id 
+    , rw.object_id 
     )
     , final_query AS (
         SELECT 
-            -- row_number() OVER(ORDER BY fg.client_id, fg.device_id, fg.session_id, fg.object_id) AS id,
-            %(filter_start)s ::TIMESTAMP as created_at
-            , %(filter_end)s ::TIMESTAMP as updated_at
+            %(filter_start)s::TIMESTAMPTZ as created_at
+            , %(filter_end)s::TIMESTAMPTZ as updated_at
             , fg.client_id
             , fg.device_id
             , fg.session_id
@@ -219,8 +223,8 @@
             , gt."in"
             , gt."out"
             , (gt."out" - gt."in") AS duration
-            , split_part(gender_age, ' - ', 1) AS gender
-            , split_part(gender_age, ' - ', 2) AS age
+            , gender
+            , '' as age
             , fg.confidence
         FROM final_gender fg
         join get_time gt on fg.client_id = gt.client_id
@@ -246,11 +250,11 @@
         ,age
         ,confidence
     FROM final_query
-    ON CONFLICT on constraint visitor_conflict
+    ON CONFLICT on constraint visitor_conflict --(client_id, device_id, session_id, object_id, zone_id, "date")
     DO UPDATE SET
         updated_at = EXCLUDED.updated_at
         ,"out" = EXCLUDED."out"
         ,duration = EXCLUDED.duration
         ,gender = EXCLUDED.gender
         ,age = EXCLUDED.age
-        ,confidence = EXCLUDED.confidence;
+        ,confidence = EXCLUDED.confidence
