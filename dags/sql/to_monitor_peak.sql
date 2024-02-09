@@ -6,40 +6,45 @@ client_id
 , zone_id 
 , gender 
 , age 
-, concat(
-    to_char(%(filter_start)s::TIMESTAMPTZ AT TIME ZONE 'Asia/Bangkok', 'HH24:MI') ||' - '||
-    to_char(%(filter_end)s::TIMESTAMPTZ AT TIME ZONE 'Asia/Bangkok', 'HH24:MI')
-) as "hour"
+, object_id
+--
+, "hour"
+from visitor_dump
+where "date" = %(filter_start)s::date
+--from visitor
+)
+, get_count as (
+select 
+client_id
+, zone_id
+, gender
+, age
+, "hour"
 , count(object_id) as "count"
-from visitor v
-where 
-"out" >= %(filter_start)s::TIMESTAMPTZ
-and 
-"out" <= %(filter_end)s::TIMESTAMPTZ
-group by
-client_id 
-, zone_id 
-, gender 
-, age 
-, concat(
-    to_char(%(filter_start)s::TIMESTAMPTZ, 'HH24:MI') ||' - '||
-    to_char(%(filter_end)s::TIMESTAMPTZ, 'HH24:MI'))
+from raw_data
+group by 
+"hour"
+, client_id
+, zone_id
+, gender
+, age
 )
 , final_result as (
 select 
 current_timestamp as created_at 
 , current_timestamp  as updated_at 
-, rw.client_id 
+, gc.client_id 
 , mc.name as client_name
-, rw.zone_id 
+, gc.zone_id 
 , mz.zone_name as zone_name
-, rw."hour"
-, rw.gender 
-, rw."age" 
-, rw."count"
-from raw_data rw
-left join master_client mc on rw.client_id = mc.id
-left join  master_zone mz on rw.zone_id = mz.id
+, gc."hour"
+, gc.gender 
+, gc."age" 
+, gc."count"
+from get_count gc
+left join master_client mc on gc.client_id = mc.id
+left join  master_zone mz on gc.zone_id = mz.id
+order by gc."hour"
 )
 insert into monitor_peak (created_at, updated_at, client_id, client_name, zone_id, zone_name, "hour", gender, "age", "count")
 select 
@@ -54,3 +59,7 @@ created_at
 , "age"
 , "count"
 from final_result fr
+-- on conflict on constraint monitor_peak_unq
+-- do NOTHING
+-- 	updated_at = EXCLUDED.updated_at
+-- 	,"count" = EXCLUDED."count"

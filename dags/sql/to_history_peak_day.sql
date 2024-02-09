@@ -6,9 +6,9 @@ client_id
 , gender 
 , age 
 , object_id 
-, to_char(date_trunc('hour',created_at),'HH24:MI') || ' - ' || to_char(DATE_TRUNC('hour', created_at) + INTERVAL '1 hour', 'HH24:MI') as "hour"
-from visitor v 
-where date(created_at) = %(filter_date)s
+, to_char(date_trunc('hour', "in" AT TIME ZONE 'Asia/Bangkok'),'HH24:MI') || ' - ' || to_char((date_trunc('hour', "in" AT TIME ZONE 'Asia/Bangkok') + INTERVAL '1 hour'), 'HH24:MI') as "hour"
+from visitor_dump
+where "date" = %(filter_date)s
 )
 , get_counts as (
 select 
@@ -28,7 +28,7 @@ group by
 )
 , final_result as (
 select 
-%(filter_date)s as "date"
+%(filter_date)s::date as "date"
 , gc.client_id 
 , mc.name as client_name
 , gc.zone_id 

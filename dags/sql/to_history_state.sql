@@ -8,7 +8,7 @@ client_id
 , object_id 
 , duration 
 from visitor v
-where date(created_at) = %(filter_date)s
+where "date" = %(filter_date)s
 )
 , get_counts as (
 select 
@@ -40,7 +40,7 @@ client_id
 )
 , final_result as (
 select 
-current_date as "date"
+%(filter_date)s::date as "date"
 , current_timestamp as created_at 
 , gc.client_id 
 , mc.name as client_name

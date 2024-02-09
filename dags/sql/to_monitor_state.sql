@@ -9,10 +9,8 @@ client_id
 , object_id 
 , duration 
 from visitor v
--- where 
--- updated_at >= %(filter_start)s::TIMESTAMPTZ
--- and 
--- updated_at <= %(filter_end)s ::TIMESTAMPTZ
+where 
+"date" = %(filter_start)s::date
 )
 , get_count as (
 select 
@@ -75,8 +73,8 @@ created_at
 , count
 , avg_dwelling_time
 from final_result
-on CONFLICT on constraint monitor_state_conflict
-DO UPDATE SET
-	updated_at = EXCLUDED.updated_at
-	, count = EXCLUDED.count
-	, avg_dwelling_time = EXCLUDED.avg_dwelling_time
+-- on CONFLICT on constraint monitor_state_conflict
+-- DO UPDATE SET
+-- 	updated_at = EXCLUDED.updated_at
+-- 	, count = EXCLUDED.count
+-- 	, avg_dwelling_time = EXCLUDED.avg_dwelling_time
