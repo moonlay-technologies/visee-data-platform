@@ -32,8 +32,8 @@ postgres_local = env["postgres_local_url"]
 postgres_visee = env["postgres_visee"]
 # job_args = Variable.get("", deserialize_json=True)
 table_name = 'raw_table'
-# database_url=postgres_visee
-database_url=postgres_local
+database_url=postgres_visee
+# database_url=postgres_local
 # -------------------Args------------------------
 args = {
     'owner': 'Moonlay',
@@ -82,8 +82,8 @@ def get_filters(ti, **kwargs):
     ti.xcom_push(key='filter_date', value=get_today)
 
 def test_filter (ti, **kwargs):
-    filter_start = '2024-02-07T06:00:00' 
-    filter_end = '2024-02-07T23:59:59'
+    filter_start = '2024-02-01T06:00:00' 
+    filter_end = '2024-02-06T23:59:59'
     filter_date = '2024-02-07' 
 
     filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
@@ -132,45 +132,45 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
     else:
         log.warning("No items found in the DynamoDB table.")
 
-get_data_dynamodb = PythonOperator(
-    task_id='dynamo_to_postgres',
-    python_callable=dynamodb_to_postgres,
-    provide_context=True,
-    op_kwargs={
-        'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-        'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
-    },
-    dag=dag
-)
+# get_data_dynamodb = PythonOperator(
+#     task_id='dynamo_to_postgres',
+#     python_callable=dynamodb_to_postgres,
+#     provide_context=True,
+#     op_kwargs={
+#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
+#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
+#     },
+#     dag=dag
+# )
 
-raw_to_demographic = SQLExecuteQueryOperator(
-    task_id='to_demographic',
-    conn_id='postgres_local',
-    sql='sql/to_demographic.sql',
-    parameters={
-        'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-        'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
-    },
-    dag=dag
-)
+# raw_to_demographic = SQLExecuteQueryOperator(
+#     task_id='to_demographic',
+#     conn_id='visee_postgres',
+#     sql='sql/to_demographic.sql',
+#     parameters={
+#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
+#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
+#     },
+#     dag=dag
+# )
 
-demographic_to_history = SQLExecuteQueryOperator(
-    task_id='to_demographic_history',
-    conn_id='postgres_local',
-    sql='sql/to_demographic_history.sql',
-    parameters={
-        'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-        'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
-    },
-    dag=dag
-)
+# demographic_to_history = SQLExecuteQueryOperator(
+#     task_id='to_demographic_history',
+#     conn_id='visee_postgres',
+#     sql='sql/to_demographic_history.sql',
+#     parameters={
+#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
+#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
+#     },
+#     dag=dag
+# )
 
 to_history_peak = SQLExecuteQueryOperator(
     task_id='to_history_peak_day',
     conn_id='visee_postgres',
     sql='sql/to_history_peak_day.sql',
     parameters={
-        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="date_today") }}'
+        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
     },
     dag=dag
 )
@@ -180,7 +180,7 @@ to_history_state = SQLExecuteQueryOperator(
     conn_id='visee_postgres',
     sql='sql/to_history_state.sql',
     parameters={
-        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="date_today") }}'
+        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
     },
     dag=dag
 )
@@ -220,4 +220,6 @@ to_history_state = SQLExecuteQueryOperator(
 # start_job >> get_filter >> get_data_dynamodb >> raw_to_demographic >> demographic_to_history 
 # demographic_to_history >> to_history_peak >> to_history_state >> truncate_visitor >> trucante_visitor_dump >> visitor_id >> visitor_dump_id >> end_job
 # ----- Test ----------------#
-start_job >> get_filter >> get_data_dynamodb >> raw_to_demographic >> demographic_to_history >> to_history_peak >> to_history_state >> end_job
+# start_job >> get_filter >> get_data_dynamodb >> raw_to_demographic >> demographic_to_history >> to_history_peak >> to_history_state >> end_job
+
+start_job >> get_filter >> to_history_peak >> to_history_state >> end_job

@@ -50,7 +50,7 @@ args = {
 dag = DAG(
     dag_id='dag_visee_etl',
     default_args=args,
-    # schedule_interval = schedule_interval,
+    schedule_interval = schedule_interval,
     concurrency=2,
     catchup=False,
     max_active_runs=3,
@@ -121,7 +121,8 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
     log.info(f"Filtering data from DynamoDB table between {filter_start_datetime} and {filter_end_datetime}")
 
     filter_expression = (Attr('created_at').gte(filter_start_datetime)
-                        & Attr('created_at').lte(filter_end_datetime))
+                        & Attr('created_at').lte(filter_end_datetime)
+                        & Attr('camera_type').eq('far'))
     
     response = table.scan(
         FilterExpression=filter_expression
