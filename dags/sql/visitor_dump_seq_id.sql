@@ -1,0 +1,1 @@
+alter sequence visitor_dump_id_seq restart with 1

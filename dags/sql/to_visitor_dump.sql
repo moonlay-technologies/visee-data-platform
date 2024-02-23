@@ -232,7 +232,7 @@ group by
     , rd.zone_id
     , rd.object_id
 )
-, final_result as (
+, final_result AS (
 select
     current_timestamp::timestamptz as created_at
     , current_timestamp::timestamptz as updated_at
@@ -245,9 +245,16 @@ select
     , gt."in"
     , gt."out"
     , (gt."out" - gt."in") as duration
-    , uga.gender
-    , '' as age
-    , cm.max_confidence as confidence
+	, TO_CHAR(
+    	("out" AT TIME ZONE 'Asia/Bangkok') - 
+    	MOD(EXTRACT(MINUTE FROM "out" AT TIME ZONE 'Asia/Bangkok'), 5) * INTERVAL '1 minute','HH24:MI') || 
+        ' - ' || 
+       TO_CHAR(
+    	("out" AT TIME ZONE 'Asia/Bangkok') + 
+        ((5 - MOD(EXTRACT(MINUTE FROM "out" AT TIME ZONE 'Asia/Bangkok'), 5)) * INTERVAL '1 minute'),'HH24:MI') AS "hour"
+	, gender
+	, '' as age
+	, cm.max_confidence as confidence
 from union_gender_all uga
 join get_time gt on uga.client_id = gt.client_id
     and uga.device_id = gt.device_id
@@ -260,28 +267,23 @@ join confidence_max cm on uga.client_id = cm.client_id
     and uga.zone_id = cm.zone_id
     and uga.object_id = cm.object_id
 )
-INSERT INTO visitor (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, "date", "in", "out", duration, gender, age, confidence)
+INSERT INTO visitor_dump (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, "date", "in", "out", duration,"hour",gender, age, confidence)
 SELECT
 	created_at 
-    ,updated_at
-    ,client_id
-    ,device_id
-    ,session_id
-    ,object_id
-    ,zone_id
-    ,"date"
-    ,"in"
-    ,"out"
-    ,duration
-    ,gender
-    ,age
-    ,confidence
+	,updated_at
+	,client_id
+	,device_id
+	,session_id
+	,object_id
+	,zone_id
+	,"date"
+	,"in"
+	,"out"
+	,duration
+	, "hour"
+	,gender
+	,age
+	,confidence
 FROM final_result
-ON CONFLICT on constraint visitor_conflict --(client_id, device_id, session_id, object_id, zone_id, "date")
-DO UPDATE SET
-	updated_at = EXCLUDED.updated_at
-	,"out" = EXCLUDED."out"
-	,duration = EXCLUDED.duration
-	,gender = EXCLUDED.gender
-	,age = EXCLUDED.age
-	,confidence = EXCLUDED.confidence
+ON CONFLICT on constraint visitor_dump_unq --(client_id, device_id, session_id, object_id, zone_id, "date")
+DO nothing 
