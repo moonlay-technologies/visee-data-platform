@@ -8,6 +8,7 @@ SELECT
     , avg(duration) as avg_dwell_time
     , count(object_id) as count_object
 FROM demographic de
+where "date" = %(filter_date)s
 group by
     client_id
     , zone_id
@@ -18,7 +19,7 @@ order by age, gender, emotion
 ) 
 , final_result as (
 select
-	current_timestamp ::TIMESTAMPTZ as "date"
+	current_date as "date"
 	, rd.client_id
 	, mc.name as client_name
 	, rd.zone_id

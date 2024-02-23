@@ -82,9 +82,9 @@ def get_filters(ti, **kwargs):
     ti.xcom_push(key='filter_date', value=get_today)
 
 def test_filter (ti, **kwargs):
-    filter_start = '2024-02-01T06:00:00' 
-    filter_end = '2024-02-06T23:59:59'
-    filter_date = '2024-02-07' 
+    filter_start = '2024-02-21T06:00:00' 
+    filter_end = '2024-02-21T23:59:59'
+    filter_date = '2024-02-21' 
 
     filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
     filter_end_datetime = datetime.strptime(filter_end, "%Y-%m-%dT%H:%M:%S")
@@ -95,8 +95,8 @@ def test_filter (ti, **kwargs):
 
 get_filter = PythonOperator(
     task_id = 'task_get_filter',
-    python_callable = get_filters,
-    # python_callable = test_filter,
+    # python_callable = get_filters,
+    python_callable = test_filter,
     provide_context=True,
     dag=dag
 )
@@ -158,10 +158,9 @@ demographic_to_history = SQLExecuteQueryOperator(
     task_id='to_demographic_history',
     conn_id='visee_postgres',
     sql='sql/to_demographic_history.sql',
-    # parameters={
-    #     'filter_start': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_start") }}',
-    #     'filter_end': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_end") }}'
-    # },
+    parameters={
+        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
+    },
     dag=dag
 )
 # ------- Create Flow -------

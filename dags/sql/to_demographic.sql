@@ -17,6 +17,7 @@ select
     , cast(confidence as float) as confidence
 from raw_table
 where object_id ~ E'^\\d+$'
+and camera_type = 'near'
 --and object_id = '2'
 --and session_id = 'd1e661cd-44c4-420e-a707-79724dd696b8'
 --where

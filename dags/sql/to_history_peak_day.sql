@@ -6,8 +6,10 @@ client_id
 , gender 
 , age 
 , object_id 
-, to_char(date_trunc('hour', "in" AT TIME ZONE 'Asia/Bangkok'),'HH24:MI') || ' - ' || to_char((date_trunc('hour', "in" AT TIME ZONE 'Asia/Bangkok') + INTERVAL '1 hour'), 'HH24:MI') as "hour"
-from visitor_dump
+--, to_char(date_trunc('hour', "in" AT TIME ZONE 'Asia/Bangkok'),'HH24:MI') || ' - ' || to_char((date_trunc('hour', "in" AT TIME ZONE 'Asia/Bangkok') + INTERVAL '1 hour'), 'HH24:MI') as "hour"
+, to_char(date_trunc('hour',created_at AT TIME ZONE 'Asia/Bangkok'),'HH24:MI') || ' - ' || to_char(DATE_TRUNC('hour', created_at AT TIME ZONE 'Asia/Bangkok') + INTERVAL '1 hour', 'HH24:MI') as "hour"
+--, to_char(date_trunc('hour',updated_at AT TIME ZONE 'Asia/Bangkok'),'HH24:MI') || ' - ' || to_char(DATE_TRUNC('hour', updated_at AT TIME ZONE 'Asia/Bangkok') + INTERVAL '1 hour', 'HH24:MI') as "hour"
+from visitor
 where "date" = %(filter_date)s
 )
 , get_counts as (
@@ -21,13 +23,14 @@ client_id
 from raw_data
 group by 
 "hour"
-, client_id 
+ ,client_id 
 , zone_id 
 , gender 
 , age
 )
 , final_result as (
 select 
+--current_date as "date"
 %(filter_date)s::date as "date"
 , gc.client_id 
 , mc.name as client_name
