@@ -10,7 +10,7 @@ recording_time::timestamptz as recording_time
 , zone_id::int
 from viseetor_line 
 where camera_type = 'far'
-    and created_at::date = %(filter_date)s
+    and recording_time::date = %(filter_date)s
 )
 , get_state as (
 select 

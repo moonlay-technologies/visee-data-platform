@@ -10,7 +10,7 @@ recording_time::timestamptz as recording_time
 , zone_id::int
 from viseetor_line 
 where camera_type = 'far'
-    and created_at::date = %(filter_date)s
+    and recording_time::date = %(filter_date)s
 )
 , to_hour as (
 select recording_time, created_at, visitor_peak, male_peak, female_peak, client_id , device_id, zone_id 

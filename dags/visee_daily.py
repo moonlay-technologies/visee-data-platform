@@ -82,9 +82,9 @@ def get_filters(ti, **kwargs):
     ti.xcom_push(key='filter_date', value=get_today)
 
 def test_filter (ti, **kwargs):
-    filter_start = '2024-03-08T06:00:00' 
-    filter_end = '2024-03-08T23:59:59'
-    filter_date = '2024-03-08' 
+    filter_start = '2024-03-13T06:00:00' 
+    filter_end = '2024-03-13T23:59:59'
+    filter_date = '2024-03-13' 
 
     filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
     filter_end_datetime = datetime.strptime(filter_end, "%Y-%m-%dT%H:%M:%S")
