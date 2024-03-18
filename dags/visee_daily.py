@@ -56,6 +56,12 @@ start_job = DummyOperator(
     dag=dag
 )
 
+waiting_task = BashOperator(
+    task_id='delay_task',
+    bash_command='sleep 1',
+    dag=dag
+)
+
 end_job = DummyOperator(
     task_id='end_task',
     dag=dag
@@ -82,9 +88,9 @@ def get_filters(ti, **kwargs):
     ti.xcom_push(key='filter_date', value=get_today)
 
 def test_filter (ti, **kwargs):
-    filter_start = '2024-03-13T06:00:00' 
-    filter_end = '2024-03-13T23:59:59'
-    filter_date = '2024-03-13' 
+    filter_start = '2024-03-15T06:00:00' 
+    filter_end = '2024-03-15T23:59:59'
+    filter_date = '2024-03-15' 
 
     filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
     filter_end_datetime = datetime.strptime(filter_end, "%Y-%m-%dT%H:%M:%S")
@@ -138,8 +144,8 @@ get_filter = PythonOperator(
 #     python_callable=viseetor_line,
 #     provide_context=True,
 #     op_kwargs={
-#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
+#         'filter_start': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_start") }}',
+#         'filter_end': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_end") }}'
 #     },
 #     dag=dag
 # )
@@ -186,25 +192,79 @@ get_viseetor_dwell = PythonOperator(
     dag=dag
 )
 #--------------------------------------------------------------#
-# to_history_peak = SQLExecuteQueryOperator(
-#     task_id='to_history_peak_day',
-#     conn_id='visee_postgres',
-#     sql='sql/to_history_peak_day.sql',
-#     parameters={
-#         'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
-#     },
-#     dag=dag
-# )
+def get_dwell(filter_date, **kwargs):
+    engine = create_engine(database_url)
+    query = f"""
+    SELECT activity, activity_date, client_id, device_id, zone_id, gender
+    FROM viseetor_dwell 
+    WHERE created_at::date = '{filter_date}'
+    """
+    df = pd.read_sql_query(query, engine)
+    df['activity_date'] = pd.to_datetime(df['activity_date'])
 
-# to_history_state = SQLExecuteQueryOperator(
-#     task_id='to_history_state',
-#     conn_id='visee_postgres',
-#     sql='sql/to_history_state.sql',
-#     parameters={
-#         'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
-#     },
-#     dag=dag
-# )
+    df_in = df[(df['gender'].isin(['female', 'male'])) & (df['activity'] == 'in')].sort_values(by=['activity_date']).reset_index(drop=True)
+    df_out = df[(df['gender'].isin(['female', 'male'])) & (df['activity'] == 'out')].sort_values(by=['activity_date']).reset_index(drop=True)
+    df_in.rename(columns={'activity_date':'activity_date_in',
+                        'gender': 'gender',
+                        'activity': 'activity_in'}, inplace=True)
+    df_out.rename(columns={'activity_date':'activity_date_out',
+                        'gender': 'gender',
+                        'activity': 'activity_out'}, inplace=True)
+
+    paired_activities = {}    
+    for _, row_in in df_in.iterrows():
+        gender = row_in['gender']
+        client_id = row_in['client_id']
+        zone_id = row_in['zone_id']
+        device_id = row_in['device_id']
+        activity_date_in = row_in['activity_date_in']
+        
+        for _, row_out in df_out.iterrows():
+            if row_out['client_id'] == client_id and row_out['zone_id']==zone_id and row_out['device_id']==device_id and row_out['gender'] == gender and row_out['activity_date_out'] > activity_date_in:
+                activity_date_out = row_out['activity_date_out']
+                df_out.drop(index=_, inplace=True)  # Drop the matched "out" activity
+                paired_activities[activity_date_in] = {
+                    'client_id':client_id,
+                    'zone_id':zone_id,
+                    'device_id':device_id,
+                    'gender': gender, 
+                    'activity_date_in': activity_date_in, 
+                    'activity_date_out': activity_date_out}
+                break
+
+    table_name='temp_dwell'
+    merged_data = pd.DataFrame.from_dict(paired_activities, orient='index').reset_index(drop=True)
+    merged_data.to_sql(table_name, engine, if_exists='replace', index=False)
+    log.info("Data written to PostgreSQL successfully.")
+
+to_dwell = PythonOperator(
+    task_id='to_get_dwell',
+    python_callable=get_dwell,
+    provide_context=True,
+    op_kwargs={'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'},
+    dag=dag
+)
 #--------------------------------------------------------------#
-# start_job >> get_filter >> get_viseetor_line >> get_viseetor_dwell >> to_history_peak >> to_history_state >> end_job
-start_job >> get_filter >> get_viseetor_dwell >> end_job
+to_history_peak = SQLExecuteQueryOperator(
+    task_id='to_history_peak_day',
+    conn_id='visee_postgres',
+    sql='sql/to_history_peak_day.sql',
+    # params={
+    #     'monitor_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
+    #     # 'monitor_date':'2024-03-15'
+    # },
+    dag=dag
+)
+
+to_history_state = SQLExecuteQueryOperator(
+    task_id='to_history_state',
+    conn_id='visee_postgres',
+    sql='sql/to_history_state.sql',
+    parameters={
+        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
+    },
+    dag=dag
+)
+#--------------------------------------------------------------#
+start_job >> get_filter >> get_viseetor_dwell >> to_dwell >> waiting_task >> to_history_state >>to_history_peak >> end_job
+# start_job >> get_filter >> get_viseetor_dwell >> end_job
