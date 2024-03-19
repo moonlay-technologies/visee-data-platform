@@ -31,7 +31,7 @@ aws_region_name = env["aws_region_name"]
 postgres_local = env["postgres_local_url"]
 postgres_visee = env["postgres_visee"]
 # job_args = Variable.get("", deserialize_json=True)
-table_name = 'raw_table'
+
 database_url=postgres_visee
 # database_url=postgres_local
 # -------------------Args------------------------
@@ -56,11 +56,17 @@ start_job = DummyOperator(
     dag=dag
 )
 
+waiting_task = BashOperator(
+    task_id='delay_task',
+    bash_command='sleep 1',
+    dag=dag
+)
+
 end_job = DummyOperator(
     task_id='end_task',
     dag=dag
 )
-# -----------------------||------------------------
+#--------------------------------------------------------------#
 def get_filters(ti, **kwargs):
     get_execute_times = datetime.now(local_tz)
     get_offset_time =get_execute_times.strftime("%Y-%m-%d %H:%M:%S.%f%z")
@@ -82,9 +88,9 @@ def get_filters(ti, **kwargs):
     ti.xcom_push(key='filter_date', value=get_today)
 
 def test_filter (ti, **kwargs):
-    filter_start = '2024-02-01T06:00:00' 
-    filter_end = '2024-02-06T23:59:59'
-    filter_date = '2024-02-07' 
+    filter_start = '2024-03-15T06:00:00' 
+    filter_end = '2024-03-15T23:59:59'
+    filter_date = '2024-03-15' 
 
     filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
     filter_end_datetime = datetime.strptime(filter_end, "%Y-%m-%dT%H:%M:%S")
@@ -95,31 +101,74 @@ def test_filter (ti, **kwargs):
 
 get_filter = PythonOperator(
     task_id = 'task_get_filter',
-    python_callable = get_filters,
-    # python_callable = test_filter,
+    # python_callable = get_filters,
+    python_callable = test_filter,
     provide_context=True,
     dag=dag
 )
-# -----------------------||------------------------
-def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
+#--------------------------------------------------------------#
+# def viseetor_line(filter_start, filter_end, **kwargs):
+#     dynamodb = boto3.resource('dynamodb',
+#                              aws_access_key_id=aws_key_id,
+#                              aws_secret_access_key=aws_secret_key,
+#                              region_name=aws_region_name
+#                              )
+#     table = dynamodb.Table('viseetor_line')
+#     filter_start_datetime = filter_start
+#     filter_end_datetime = filter_end
+
+#     log.info(f"Filtering DynamoDB table between {filter_start_datetime} and {filter_end_datetime}")
+#     filter_expression = (Attr('created_at').gte(filter_start_datetime)
+#                          & Attr('created_at').lte(filter_end_datetime)
+#                          & Attr('camera_type').eq('far'))
+    
+#     response = table.scan(
+#         FilterExpression=filter_expression
+#     )
+#     items = response.get('Items', [])
+#     table_name = 'viseetor_line'
+#     if items:
+#         log.info(f"Retrieved {len(items)} items from DynamoDB")
+#         df_raw = pd.DataFrame(items)
+
+#         log.info(f"Data types before insertion: {df_raw.dtypes}")
+
+#         engine = create_engine(database_url)
+#         df_raw.to_sql(table_name, engine, if_exists='replace', index=False)
+#         log.info("Data written to PostgreSQL successfully.")
+#     else:
+#         log.warning("No items found in the DynamoDB table.")
+
+# get_viseetor_line = PythonOperator(
+#     task_id='get_data_viseetor_line',
+#     python_callable=viseetor_line,
+#     provide_context=True,
+#     op_kwargs={
+#         'filter_start': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_start") }}',
+#         'filter_end': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_end") }}'
+#     },
+#     dag=dag
+# )
+#--------------------------------------------------------------#
+def viseetor_dwell_to_postgress(filter_start, filter_end, **kwargs):
     dynamodb = boto3.resource('dynamodb',
                              aws_access_key_id=aws_key_id,
                              aws_secret_access_key=aws_secret_key,
                              region_name=aws_region_name
                              )
-    table = dynamodb.Table('viseetor_raw')
+    table = dynamodb.Table('viseetor_dwell')
     filter_start_datetime = filter_start
     filter_end_datetime = filter_end
 
     log.info(f"Filtering DynamoDB table between {filter_start_datetime} and {filter_end_datetime}")
     filter_expression = (Attr('created_at').gte(filter_start_datetime)
-                         & Attr('created_at').lte(filter_end_datetime)
-                         & Attr('camera_type').eq('near'))
+                         & Attr('created_at').lte(filter_end_datetime))
     
     response = table.scan(
         FilterExpression=filter_expression
     )
     items = response.get('Items', [])
+    table_name = 'viseetor_dwell'
     if items:
         log.info(f"Retrieved {len(items)} items from DynamoDB")
         df_raw = pd.DataFrame(items)
@@ -132,46 +181,78 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
     else:
         log.warning("No items found in the DynamoDB table.")
 
-# get_data_dynamodb = PythonOperator(
-#     task_id='dynamo_to_postgres',
-#     python_callable=dynamodb_to_postgres,
-#     provide_context=True,
-#     op_kwargs={
-#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
-#     },
-#     dag=dag
-# )
+get_viseetor_dwell = PythonOperator(
+    task_id='get_data_viseetor_dwell',
+    python_callable=viseetor_dwell_to_postgress,
+    provide_context=True,
+    op_kwargs={
+        'filter_start': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_start") }}',
+        'filter_end': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_end") }}'
+    },
+    dag=dag
+)
+#--------------------------------------------------------------#
+def get_dwell(filter_date, **kwargs):
+    engine = create_engine(database_url)
+    query = f"""
+    SELECT activity, activity_date, client_id, device_id, zone_id, gender
+    FROM viseetor_dwell 
+    WHERE created_at::date = '{filter_date}'
+    """
+    df = pd.read_sql_query(query, engine)
+    df['activity_date'] = pd.to_datetime(df['activity_date'])
 
-# raw_to_demographic = SQLExecuteQueryOperator(
-#     task_id='to_demographic',
-#     conn_id='visee_postgres',
-#     sql='sql/to_demographic.sql',
-#     parameters={
-#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
-#     },
-#     dag=dag
-# )
+    df_in = df[(df['gender'].isin(['female', 'male'])) & (df['activity'] == 'in')].sort_values(by=['activity_date']).reset_index(drop=True)
+    df_out = df[(df['gender'].isin(['female', 'male'])) & (df['activity'] == 'out')].sort_values(by=['activity_date']).reset_index(drop=True)
+    df_in.rename(columns={'activity_date':'activity_date_in',
+                        'gender': 'gender',
+                        'activity': 'activity_in'}, inplace=True)
+    df_out.rename(columns={'activity_date':'activity_date_out',
+                        'gender': 'gender',
+                        'activity': 'activity_out'}, inplace=True)
 
-# demographic_to_history = SQLExecuteQueryOperator(
-#     task_id='to_demographic_history',
-#     conn_id='visee_postgres',
-#     sql='sql/to_demographic_history.sql',
-#     parameters={
-#         'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-#         'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
-#     },
-#     dag=dag
-# )
+    paired_activities = {}    
+    for _, row_in in df_in.iterrows():
+        gender = row_in['gender']
+        client_id = row_in['client_id']
+        zone_id = row_in['zone_id']
+        device_id = row_in['device_id']
+        activity_date_in = row_in['activity_date_in']
+        
+        for _, row_out in df_out.iterrows():
+            if row_out['client_id'] == client_id and row_out['zone_id']==zone_id and row_out['device_id']==device_id and row_out['gender'] == gender and row_out['activity_date_out'] > activity_date_in:
+                activity_date_out = row_out['activity_date_out']
+                df_out.drop(index=_, inplace=True)  # Drop the matched "out" activity
+                paired_activities[activity_date_in] = {
+                    'client_id':client_id,
+                    'zone_id':zone_id,
+                    'device_id':device_id,
+                    'gender': gender, 
+                    'activity_date_in': activity_date_in, 
+                    'activity_date_out': activity_date_out}
+                break
 
+    table_name='temp_dwell'
+    merged_data = pd.DataFrame.from_dict(paired_activities, orient='index').reset_index(drop=True)
+    merged_data.to_sql(table_name, engine, if_exists='replace', index=False)
+    log.info("Data written to PostgreSQL successfully.")
+
+to_dwell = PythonOperator(
+    task_id='to_get_dwell',
+    python_callable=get_dwell,
+    provide_context=True,
+    op_kwargs={'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'},
+    dag=dag
+)
+#--------------------------------------------------------------#
 to_history_peak = SQLExecuteQueryOperator(
     task_id='to_history_peak_day',
     conn_id='visee_postgres',
     sql='sql/to_history_peak_day.sql',
-    parameters={
-        'filter_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
-    },
+    # params={
+    #     'monitor_date': '{{ ti.xcom_pull(task_ids="task_get_filter", key="filter_date") }}'
+    #     # 'monitor_date':'2024-03-15'
+    # },
     dag=dag
 )
 
@@ -184,42 +265,6 @@ to_history_state = SQLExecuteQueryOperator(
     },
     dag=dag
 )
-#------------------------Open When Daily---------------------------#
-# truncate_visitor = SQLExecuteQueryOperator(
-#     task_id='visitor_truncate',
-#     conn_id='visee_postgres',
-#     sql='sql/truncate_visitor.sql',
-#     dag=dag
-# )
-
-# visitor_id = SQLExecuteQueryOperator(
-#     task_id='visitor_seq_id',
-#     conn_id='visee_postgres',
-#     sql='sql/visitor_seq_id.sql',
-#     dag=dag
-# )
-
-# trucante_visitor_dump = SQLExecuteQueryOperator(
-#     task_id='visitor_dump_truncate',
-#     conn_id='visee_postgres',
-#     sql='sql/truncate_visitor_dump.sql',
-#     dag=dag
-# )
-
-# visitor_dump_id = SQLExecuteQueryOperator(
-#     task_id='visitor_dump_seq_id',
-#     conn_id='visee_postgres',
-#     sql='sql/visitor_dump_seq_id.sql',
-#     dag=dag
-# )
 #--------------------------------------------------------------#
-
-
-# ------- Create Flow -------
-# ----- When Daily-----------#
-# start_job >> get_filter >> get_data_dynamodb >> raw_to_demographic >> demographic_to_history 
-# demographic_to_history >> to_history_peak >> to_history_state >> truncate_visitor >> trucante_visitor_dump >> visitor_id >> visitor_dump_id >> end_job
-# ----- Test ----------------#
-# start_job >> get_filter >> get_data_dynamodb >> raw_to_demographic >> demographic_to_history >> to_history_peak >> to_history_state >> end_job
-
-start_job >> get_filter >> to_history_peak >> to_history_state >> end_job
+start_job >> get_filter >> get_viseetor_dwell >> to_dwell >> waiting_task >> to_history_state >>to_history_peak >> end_job
+# start_job >> get_filter >> get_viseetor_dwell >> end_job
