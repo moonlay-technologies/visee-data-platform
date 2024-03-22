@@ -55,7 +55,7 @@ args = {
 dag = DAG(
     dag_id='dag_visee_etl',
     default_args=args,
-    # schedule_interval = schedule_interval,
+    schedule_interval = schedule_interval,
     concurrency=2,
     catchup=False,
     max_active_runs=3,
@@ -113,8 +113,8 @@ def test_filter (ti, **kwargs):
 
 get_filter = PythonOperator(
     task_id='get_filter',
-    # python_callable=get_filters,
-    python_callable=test_filter,
+    python_callable=get_filters,
+    # python_callable=test_filter,
     provide_context=True,
     dag=dag
 )
