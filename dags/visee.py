@@ -20,6 +20,11 @@ from airflow.models import Variable
 import pendulum
 from boto3.dynamodb.conditions import Attr
 import logging
+# from airflow.operators.email import EmailOperator
+
+# email_subject_success = "Visee ETL Job Succeeded"
+# email_subject_failure = "Visee ETL Job Failed"
+# email_recipients = ["ivan.rivaldo@moonlay.com","astrid.anggraini@moonlay.com"]
 
 
 log = logging.getLogger(__name__)
@@ -44,13 +49,13 @@ args = {
     'depends_on_past': False,
     'start_date': datetime(2024, 1, 15, tzinfo=local_tz),
     'retries': 2,
-    'retry_delay': timedelta(minutes=2)
+    'retry_delay': timedelta(seconds=90)
 }
 # -------------------DAG------------------------
 dag = DAG(
     dag_id='dag_visee_etl',
     default_args=args,
-    schedule_interval = schedule_interval,
+    # schedule_interval = schedule_interval,
     concurrency=2,
     catchup=False,
     max_active_runs=3,
@@ -95,9 +100,9 @@ def get_filters(ti, **kwargs):
     ti.xcom_push(key='filter_date', value=get_today)
 
 def test_filter (ti, **kwargs):
-    filter_start = '2024-03-12T06:00:00' 
-    filter_end = '2024-03-12T23:59:59'
-    filter_date = '2024-03-12' 
+    filter_start = '2024-03-15T06:00:00' 
+    filter_end = '2024-03-15T23:59:59'
+    filter_date = '2024-03-15' 
 
     filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
     filter_end_datetime = datetime.strptime(filter_end, "%Y-%m-%dT%H:%M:%S")
@@ -108,8 +113,8 @@ def test_filter (ti, **kwargs):
 
 get_filter = PythonOperator(
     task_id='get_filter',
-    python_callable=get_filters,
-    # python_callable=test_filter,
+    # python_callable=get_filters,
+    python_callable=test_filter,
     provide_context=True,
     dag=dag
 )
@@ -140,7 +145,25 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
         # df_raw.sort_values(by='created_at', inplace=True, ascending=True)
         # # Get the first row after sorting
         # sorted_data = df_raw.head(10000)
-        log.info(f"Data types before insertion: {df_raw.dtypes}")
+        log.info(f"Data types before convert: {df_raw.dtypes}")
+        # Convert TypeData & Rename Columns
+        df_raw.rename(columns={'id':'id_dynamo'}, inplace=True)
+        df_raw['created_at'] = pd.to_datetime(df_raw['created_at'], utc=True, errors='coerce')
+        df_raw['recording_time'] = pd.to_datetime(df_raw['recording_time'], utc=True, errors='coerce')
+        df_raw['client_id'] = df_raw['client_id'].astype('int')
+        df_raw['zone_id'] = df_raw['zone_id'].astype('int')
+        df_raw['device_id'] = df_raw['device_id'].astype('int')
+        df_raw['visitor_peak'] = df_raw['visitor_peak'].astype('int')
+        df_raw['female_peak'] = df_raw['female_peak'].astype('int')
+        df_raw['male_peak'] = df_raw['male_peak'].astype('int')
+        df_raw['visitor_in'] = df_raw['visitor_in'].astype('int')
+        df_raw['female_in'] = df_raw['female_in'].astype('int')
+        df_raw['male_in'] = df_raw['male_in'].astype('int')
+        df_raw['visitor_out'] = df_raw['visitor_out'].astype('int')
+        df_raw['female_out'] = df_raw['female_out'].astype('int')
+        df_raw['male_out'] = df_raw['male_out'].astype('int')
+
+        log.info(f"Data types after convert: {df_raw.dtypes}")
         # Insert data into PostgreSQL table
         engine = create_engine(database_url)
         df_raw.to_sql(table_name, engine, if_exists='append', index=False)
@@ -206,7 +229,6 @@ monitor_peak_id = SQLExecuteQueryOperator(
     sql='sql/monitor_peak_seq_id.sql',
     dag=dag
 )
-
 # ---------------------------DAG Flow----------------------------
 # start_task >> get_filter >> to_visitor_raw  >> raw_to_visitor >> monitor_peak_truncate >> monitor_peak_id >> monitor_peak_truncate >> monitor_state_truncate >> monitor_state_id >> visitor_to_monitor_peak >> delay_task >> end_task
 start_task >> get_filter >> get_data_dynamodb  
@@ -216,5 +238,4 @@ get_data_dynamodb >> monitor_peak_truncate >> monitor_peak_id >> raw_line_to_mon
 get_data_dynamodb >> monitor_state_truncate >> monitor_state_id >> raw_line_to_monitor_state >> delay_task
 
 delay_task >> end_task
-
 # start_task >> get_filter >> get_data_dynamodb >> end_task

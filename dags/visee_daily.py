@@ -99,10 +99,11 @@ def test_filter (ti, **kwargs):
     ti.xcom_push(key='filter_end', value=filter_end_datetime.strftime("%Y-%m-%d %H:%M:%S.%f") + '+07:00')
     ti.xcom_push(key='filter_date', value=filter_date)
 
+#---------------WARNING!!!!!!-----------------#
 get_filter = PythonOperator(
     task_id = 'task_get_filter',
-    # python_callable = get_filters,
-    python_callable = test_filter,
+    python_callable = get_filters,
+    # python_callable = test_filter,
     provide_context=True,
     dag=dag
 )
