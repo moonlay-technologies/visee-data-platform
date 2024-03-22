@@ -30,6 +30,8 @@ aws_secret_key = env["aws_secret_key"]
 aws_region_name = env["aws_region_name"]
 postgres_local = env["postgres_local_url"]
 postgres_visee = env["postgres_visee"]
+conf = Variable.get("visee_config", deserialize_json=True)
+schedule_interval = conf["schedule_daily"]
 # job_args = Variable.get("", deserialize_json=True)
 
 database_url=postgres_visee
@@ -46,6 +48,7 @@ args = {
 dag = DAG(
     dag_id='dag_visee_daily_etl',
     default_args=args,
+    schedule_interval = schedule_interval,
     concurrency=2,
     catchup=False,
     tags=['visee']
