@@ -113,8 +113,8 @@ def test_filter (ti, **kwargs):
 
 get_filter = PythonOperator(
     task_id='get_filter',
-    # python_callable=get_filters,
-    python_callable=test_filter,
+    python_callable=get_filters,
+    # python_callable=test_filter,
     provide_context=True,
     dag=dag
 )
