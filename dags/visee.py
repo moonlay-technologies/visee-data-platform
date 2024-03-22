@@ -20,6 +20,11 @@ from airflow.models import Variable
 import pendulum
 from boto3.dynamodb.conditions import Attr
 import logging
+# from airflow.operators.email import EmailOperator
+
+# email_subject_success = "Visee ETL Job Succeeded"
+# email_subject_failure = "Visee ETL Job Failed"
+# email_recipients = ["ivan.rivaldo@moonlay.com","astrid.anggraini@moonlay.com"]
 
 
 log = logging.getLogger(__name__)
@@ -44,13 +49,13 @@ args = {
     'depends_on_past': False,
     'start_date': datetime(2024, 1, 15, tzinfo=local_tz),
     'retries': 2,
-    'retry_delay': timedelta(minutes=2)
+    'retry_delay': timedelta(seconds=90)
 }
 # -------------------DAG------------------------
 dag = DAG(
     dag_id='dag_visee_etl',
     default_args=args,
-    schedule_interval = schedule_interval,
+    # schedule_interval = schedule_interval,
     concurrency=2,
     catchup=False,
     max_active_runs=3,
@@ -108,8 +113,8 @@ def test_filter (ti, **kwargs):
 
 get_filter = PythonOperator(
     task_id='get_filter',
-    python_callable=get_filters,
-    # python_callable=test_filter,
+    # python_callable=get_filters,
+    python_callable=test_filter,
     provide_context=True,
     dag=dag
 )
@@ -224,7 +229,6 @@ monitor_peak_id = SQLExecuteQueryOperator(
     sql='sql/monitor_peak_seq_id.sql',
     dag=dag
 )
-
 # ---------------------------DAG Flow----------------------------
 # start_task >> get_filter >> to_visitor_raw  >> raw_to_visitor >> monitor_peak_truncate >> monitor_peak_id >> monitor_peak_truncate >> monitor_state_truncate >> monitor_state_id >> visitor_to_monitor_peak >> delay_task >> end_task
 start_task >> get_filter >> get_data_dynamodb  
@@ -234,5 +238,4 @@ get_data_dynamodb >> monitor_peak_truncate >> monitor_peak_id >> raw_line_to_mon
 get_data_dynamodb >> monitor_state_truncate >> monitor_state_id >> raw_line_to_monitor_state >> delay_task
 
 delay_task >> end_task
-
 # start_task >> get_filter >> get_data_dynamodb >> end_task
