@@ -71,7 +71,7 @@ end_job = DummyOperator(
 )
 #--------------------------------------------------------------#
 def get_filters(ti, **kwargs):
-    get_execute_times = datetime.now(local_tz)
+    get_execute_times = datetime.now(local_tz) - timedelta(days=1)
     get_offset_time =get_execute_times.strftime("%Y-%m-%d %H:%M:%S.%f%z")
     get_today = get_execute_times.strftime("%Y-%m-%d")
 
