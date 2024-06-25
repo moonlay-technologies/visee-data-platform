@@ -17,5 +17,5 @@ select
 , gender
 , age 
 , coalesce("count",0) as "count"
-, 0 as "avg_dwell_time"
+, 1 * interval '1 second' as "avg_dwell_time"
 from final_result
