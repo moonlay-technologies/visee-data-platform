@@ -23,12 +23,11 @@ with join_emotion as (
 INSERT INTO demographic (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, "date", "in", "out", duration, gender, age, emotion, attributes, confidence)
 SELECT min(object_in) as created_at, 
 	max(object_out) as updated_at, 
-	max(appear) as appear, 
 	client_id, 
 	device_id, 
-	zone_id, 
 	session_id, 
 	r.object_id , 
+	zone_id, 
 	min(record_date) as "date", 
 	min(object_in) as "in", 
 	max(object_out) as "out", 
