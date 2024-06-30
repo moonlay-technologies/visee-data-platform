@@ -20,7 +20,7 @@ with join_emotion as (
     GROUP BY client_id, device_id, zone_id, session_id, object_id, gender, age
 )
 
-INSERT INTO demographic (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, record_date, object_in, object_out, duration, gender, age, emotion, attributes, confidence)
+INSERT INTO demographic (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, "date", "in", "out", duration, gender, age, emotion, attributes, confidence)
 SELECT min(object_in) as created_at, 
 	max(object_out) as updated_at, 
 	max(appear) as appear, 
@@ -29,9 +29,9 @@ SELECT min(object_in) as created_at,
 	zone_id, 
 	session_id, 
 	r.object_id , 
-	min(record_date) as record_date, 
-	min(object_in) as object_in, 
-	max(object_out) as object_out, 
+	min(record_date) as "date", 
+	min(object_in) as "in", 
+	max(object_out) as "out", 
 	EXTRACT(EPOCH FROM (max(object_out)::timestamp - min(object_in)::timestamp)) AS duration,
 	gender, 
 	age,
