@@ -21,22 +21,22 @@ with join_emotion as (
 )
 
 INSERT INTO demographic (created_at, updated_at, client_id, device_id, session_id, object_id, zone_id, "date", "in", "out", duration, gender, age, emotion, attributes, confidence)
-SELECT min(object_in) as created_at, 
-	max(object_out) as updated_at, 
-	client_id, 
-	device_id, 
-	session_id, 
-	r.object_id , 
-	zone_id, 
-	min(record_date) as "date", 
-	min(object_in) as "in", 
-	max(object_out) as "out", 
+SELECT CAST(min(object_in) AS TIMESTAMP) as created_at, 
+	CAST(max(object_out) AS TIMESTAMP) as updated_at, 
+	client_id::int, 
+	device_id::int, 
+	session_id::uuid, 
+	r.object_id::int , 
+	zone_id::int, 
+	CAST(min(record_date) AS DATE) as "date", 
+	CAST(min(object_in) AS TIMESTAMP) as "in", 
+	CAST(max(object_out) AS TIMESTAMP) as "out", 
 	EXTRACT(EPOCH FROM (max(object_out)::timestamp - min(object_in)::timestamp)) AS duration,
 	gender, 
 	age,
 	je.emotion as emotion,
 	ja.attributes as attributes,
-	max(confidence) as confidence 
+	CAST(max(confidence) as float) as confidence 
 FROM (
 	SELECT *
 	FROM ranked
