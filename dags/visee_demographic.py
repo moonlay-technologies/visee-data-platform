@@ -70,7 +70,7 @@ def get_filters(ti, **kwargs):
 
     formated_times = datetime.strptime(get_offset_time, "%Y-%m-%d %H:%M:%S.%f%z")
 
-    filter_start = formated_times.replace(hour=6,minute=0,second=0, microsecond=0)
+    filter_start = formated_times.replace(hour=0,minute=1,second=0, microsecond=0)
     filter_end = formated_times.replace(hour=23,minute=59, second=59, microsecond=999999)
 
     log.info(f"filter_start: {filter_start}")
