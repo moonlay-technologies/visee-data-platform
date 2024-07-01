@@ -51,10 +51,7 @@ select
 	, avg_dwell_time
 	, emotion
 from final_result
-ON CONFLICT (client_id, zone_id, gender, "date") DO UPDATE
+ON CONFLICT (client_id, zone_id, gender, age, emotion, date) DO UPDATE
     SET 
-        created_at = EXCLUDED.created_at,
-        age = EXCLUDED.age,
         "count" = EXCLUDED."count",
-        avg_dwell_time = EXCLUDED.avg_dwell_time,
-        emotion = EXCLUDED.emotion;
+        avg_dwell_time = EXCLUDED.avg_dwell_time;
