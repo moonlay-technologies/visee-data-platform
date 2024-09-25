@@ -42,8 +42,8 @@ postgres_local = env["postgres_local_url"]
 
 conf = Variable.get("visee_config", deserialize_json=True)
 schedule_interval = conf["schedule_interval"]
-# database_url=postgres_visee
-database_url = postgres_local
+database_url=postgres_visee
+# database_url = postgres_local
 table_name = 'viseetor_raw'
 
 # -------------------Args------------------------
@@ -191,7 +191,7 @@ get_data_dynamodb = PythonOperator(
 # ------------------Transform and Load Data-------------------
 raw_to_live_demographic = PostgresOperator(
     task_id='to_live_demographic',
-    postgres_conn_id='postgres_local',
+    postgres_conn_id='postgres_visee',
     sql='sql/live-demographic.sql', 
     params={
         'filter_date': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_date") }}'

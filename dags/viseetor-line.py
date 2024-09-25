@@ -192,7 +192,7 @@ get_data_dynamodb = PythonOperator(
 # ------------------Transform and Load Data-------------------
 raw_line_to_live_visitor = PostgresOperator(
     task_id='to_live_visitor',
-    postgres_conn_id='postgres_local',
+    postgres_conn_id='postgres_visee',
     sql='sql/live-visitor.sql',
     params={
         'filter_date': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_date") }}'
