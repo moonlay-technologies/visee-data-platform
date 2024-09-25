@@ -43,7 +43,7 @@ select distinct on(gd.age, gd.gender, gd.emotion, gd.client_id, gd.zone_id, gd.o
 	, gd.gender
 	, gd.emotion
 	, gd.object_id
-	, gd.session_id
+	, gd.session_id::uuid
 	, rd.recording_time as record_time
 from grouped_data gd
 join rank_data rd 
