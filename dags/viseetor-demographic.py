@@ -40,8 +40,8 @@ aws_region_name = env["aws_region_name"]
 postgres_visee = env["postgres_visee"]
 postgres_local = env["postgres_local_url"]
 
-# conf = Variable.get("visee_config", deserialize_json=True)
-# schedule_interval = conf["schedule_interval"]
+conf = Variable.get("visee_config", deserialize_json=True)
+schedule_interval = conf["schedule_interval"]
 # database_url=postgres_visee
 database_url = postgres_local
 table_name = 'viseetor_raw'
@@ -59,7 +59,7 @@ args = {
 dag = DAG(
     dag_id='dag_live_demographic_etl',
     default_args=args,
-    schedule_interval='@daily', #schedule_interval,
+    schedule_interval=schedule_interval,
     catchup=False,
     tags=['visee'],
     concurrency=2,
