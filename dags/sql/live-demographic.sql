@@ -59,9 +59,8 @@ WITH ranked_gender AS (
 )
 
 
-insert into live_demographic (created_at, record_time, record_time_end, avg_dwell_time, client_id, zone_id, object_id, session_id, gender, emotion, age)
+insert into live_demographic (record_time, record_time_end, avg_dwell_time, client_id, zone_id, object_id, session_id, gender, emotion, age)
 SELECT 
-	max(created_at) as created_at,
 	min(recording_time) as recording_time,
 	max(recording_time) as recording_time_end,
 	max(recording_time) - min(recording_time) as dwell_time,

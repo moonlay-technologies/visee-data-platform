@@ -49,7 +49,7 @@ args = {
 
 # -------------------DAG------------------------
 dag = DAG(
-    dag_id='viseetor-demographic',
+    dag_id='visee-demographic',
     default_args=args,
     schedule_interval=schedule_interval,
     catchup=False,
@@ -67,8 +67,6 @@ def getTimeFilter(ti, **kwargs):
     get_execute_times = datetime.now(local_tz)
     get_offset_time =get_execute_times.strftime("%Y-%m-%d %H:%M:%S.%f%z")
     get_today = get_execute_times.strftime("%Y-%m-%d")
-
-    get_offset = get_execute_times.strftime("%z")
 
     formated_times = datetime.strptime(get_offset_time, "%Y-%m-%d %H:%M:%S.%f%z")
 
