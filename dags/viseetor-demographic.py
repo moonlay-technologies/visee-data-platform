@@ -22,12 +22,6 @@ from botocore.exceptions import WaiterError
 from botocore.exceptions import NoCredentialsError
 # from dotenv import load_dotenv
 
-# # from airflow.operators.email import EmailOperator
-# # email_subject_success = "Visee ETL Job Succeeded"
-# # email_subject_failure = "Visee ETL Job Failed"
-# # email_recipients = ["ivan.rivaldo@moonlay.com","astrid.anggraini@moonlay.com"]
-
-
 log = logging.getLogger(__name__)
 
 # -------------------Variables------------------------
@@ -38,12 +32,10 @@ aws_key_id = env["aws_key_id"]
 aws_secret_key = env["aws_secret_key"]
 aws_region_name = env["aws_region_name"]
 postgres_visee = env["postgres_visee"]
-postgres_local = env["postgres_local_url"]
 
 conf = Variable.get("visee_config", deserialize_json=True)
 schedule_interval = conf["schedule_interval"]
 database_url=postgres_visee
-# database_url = postgres_local
 table_name = 'viseetor_raw'
 
 # -------------------Args------------------------
@@ -51,13 +43,13 @@ args = {
     'owner': 'Moonlay',
     'start_date': datetime(2024, 9, 19, tzinfo=local_tz),
     'retries': 2,
-    'retry_delay': timedelta(seconds=90)
+    'retry_delay': timedelta(seconds=10)
     # 'depends_on_past': False,
 }
 
 # -------------------DAG------------------------
 dag = DAG(
-    dag_id='dag_live_demographic_etl',
+    dag_id='viseetor-demographic',
     default_args=args,
     schedule_interval=schedule_interval,
     catchup=False,
@@ -70,17 +62,8 @@ dag.doc_md = """
 Visee ETL for Demographic
 """
 
-# -------------------Dummy Task------------------------
-start_task = DummyOperator(
-    task_id='start_task', 
-    dag=dag)
-
-end_task = DummyOperator(
-    task_id='end_task', 
-    dag=dag)
-
 # -------------------Filter Time-------------------
-def get_filter_time(ti, **kwargs):
+def getTimeFilter(ti, **kwargs):
     get_execute_times = datetime.now(local_tz)
     get_offset_time =get_execute_times.strftime("%Y-%m-%d %H:%M:%S.%f%z")
     get_today = get_execute_times.strftime("%Y-%m-%d")
@@ -92,36 +75,31 @@ def get_filter_time(ti, **kwargs):
     filter_start = (formated_times - timedelta(minutes=5)).replace(second=0, microsecond=1)
     filter_end = formated_times.replace(second=0, microsecond=0)
 
-    log.info(f"filter_start: {filter_start}")
-    log.info(f"filter_end: {filter_end}")
-    log.info(f"filter_date: {get_today}")
-
-    ti.xcom_push(key='filter_start', value=filter_start.strftime("%Y-%m-%d %H:%M:%S.%f") + filter_start.strftime("%z")[:3] + ':' + filter_start.strftime("%z")[3:])
-    ti.xcom_push(key='filter_end', value=filter_end.strftime("%Y-%m-%d %H:%M:%S.%f") + filter_end.strftime("%z")[:3] + ':' + filter_end.strftime("%z")[3:])
+    ti.xcom_push(key='filter_start', value=filter_start.strftime("%Y-%m-%d %H:%M:%S%f%z")[:-2] + ':' + filter_start.strftime("%Y-%m-%d %H:%M:%S%f%z")[-2:])
+    ti.xcom_push(key='filter_end', value=filter_end.strftime("%Y-%m-%d %H:%M:%S%f%z")[:-2] + ':' + filter_end.strftime("%Y-%m-%d %H:%M:%S%f%z")[-2:])
     ti.xcom_push(key='filter_date', value=get_today)
 
-def test_filter_time (ti, **kwargs):
-    filter_start = '2024-09-19T05:30:00' ###
-    filter_end = '2024-09-19T23:59:59'###
-    filter_date = '2024-09-19' ###
+# def getTimeFilterTest(ti, **kwargs):
+#     start = '2024-09-26T05:30:00' ###
+#     end = '2024-09-26T23:59:59'###
+#     date = '2024-09-26' ###
 
-    filter_start_datetime = datetime.strptime(filter_start, "%Y-%m-%dT%H:%M:%S")
-    filter_end_datetime = datetime.strptime(filter_end, "%Y-%m-%dT%H:%M:%S")
+#     filter_start = datetime.strptime(start, "%Y-%m-%dT%H:%M:%S")
+#     filter_end = datetime.strptime(end, "%Y-%m-%dT%H:%M:%S")
 
-    ti.xcom_push(key='filter_start', value=filter_start_datetime.strftime("%Y-%m-%d %H:%M:%S.%f") + '+07:00')
-    ti.xcom_push(key='filter_end', value=filter_end_datetime.strftime("%Y-%m-%d %H:%M:%S.%f") + '+07:00')
-    ti.xcom_push(key='filter_date', value=filter_date)
+#     ti.xcom_push(key='filter_start', value=filter_start.strftime("%Y-%m-%d %H:%M:%S%f%z")[:-2] + ':' + filter_start.strftime("%Y-%m-%d %H:%M:%S%f%z")[-2:])
+#     ti.xcom_push(key='filter_end', value=filter_end.strftime("%Y-%m-%d %H:%M:%S%f%z")[:-2] + ':' + filter_end.strftime("%Y-%m-%d %H:%M:%S%f%z")[-2:])
+#     ti.xcom_push(key='filter_date', value=date)
 
 get_time_filter = PythonOperator(
-    task_id='get_filter',
-    # python_callable=get_filter_time,
-    python_callable=test_filter_time,
+    task_id='get_time_filter',
+    python_callable=getTimeFilter,
     provide_context=True,
     dag=dag
 )
 
 # ------------------Get Data from Dynamo DB-------------------
-def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
+def getDataDynamoDB(filter_start, filter_end, **kwargs):
     dynamodb = boto3.resource('dynamodb',
                              aws_access_key_id=aws_key_id,
                              aws_secret_access_key= aws_secret_key,
@@ -144,11 +122,6 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
         log.info(f"Retrieved {len(items)} items from DynamoDB")
         df_raw = pd.DataFrame(items)
 
-        # Sort DataFrame by 'created_at'
-        # df_raw.sort_values(by='created_at', inplace=True, ascending=True)
-
-        # # Get the first row after sorting
-        # sorted_data = df_raw.head(10000)
         log.info(f"Data types before convert: {df_raw.dtypes}")
 
         # Convert Data Type & Rename Columns
@@ -157,7 +130,7 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
         df_raw['attributes'] = df_raw['attributes'].astype(str)
         df_raw['camera_type'] = df_raw['camera_type'].astype(str)
         df_raw['client_id'] = df_raw['client_id'].astype('int')
-        df_raw['confidence'] = df_raw['confidence'].astype('int')
+        df_raw['confidence'] = df_raw['confidence'].astype('float')
         df_raw['created_at'] = pd.to_datetime(df_raw['created_at'], utc=True, errors='coerce')
         df_raw['device_id'] = df_raw['device_id'].astype('int')
         df_raw['emotion'] = df_raw['emotion'].astype(str)
@@ -178,12 +151,12 @@ def dynamodb_to_postgres(filter_start, filter_end, **kwargs):
         log.warning("No items found in the DynamoDB table.")
 
 get_data_dynamodb = PythonOperator(
-    task_id='dynamo_to_postgres',
-    python_callable=dynamodb_to_postgres,
+    task_id='get_data_dynamodb',
+    python_callable=getDataDynamoDB,
     provide_context=True,
     op_kwargs={
-        'filter_start': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_start") }}',
-        'filter_end': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_end") }}'
+        'filter_start': '{{ ti.xcom_pull(task_ids="get_time_filter", key="filter_start") }}',
+        'filter_end': '{{ ti.xcom_pull(task_ids="get_time_filter", key="filter_end") }}'
     },
     dag=dag
 )
@@ -194,10 +167,18 @@ raw_to_live_demographic = PostgresOperator(
     postgres_conn_id='postgres_visee',
     sql='sql/live-demographic.sql', 
     params={
-        'filter_date': '{{ ti.xcom_pull(task_ids="get_filter", key="filter_date") }}'
+        'filter_date': '{{ ti.xcom_pull(task_ids="get_time_filter", key="filter_date") }}'
     },
     dag=dag
 )
 
+# ------------------Truncate Raw Data-------------------
+viseetor_raw_truncate = PostgresOperator(
+    task_id='truncate_viseetor_raw',
+    postgres_conn_id='postgres_visee',
+    sql='sql/truncate_viseetor_raw.sql',
+    dag=dag
+)
+
 # ---------------------------DAG Flow----------------------------
-start_task >> get_time_filter >> get_data_dynamodb >> raw_to_live_demographic >> end_task
+get_time_filter >> get_data_dynamodb >> raw_to_live_demographic >> viseetor_raw_truncate
