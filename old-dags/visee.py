@@ -35,14 +35,12 @@ env =  Variable.get("visee_credential", deserialize_json=True)
 aws_key_id = env["aws_key_id"]
 aws_secret_key = env["aws_secret_key"]
 aws_region_name = env["aws_region_name"]
-postgres_local = env["postgres_local_url"]
 postgres_visee = env["postgres_visee"]
 conf = Variable.get("visee_config", deserialize_json=True)
 schedule_interval = conf["schedule_interval"]
 table_name = 'viseetor_line'
 
 database_url=postgres_visee
-# database_url=postgres_local
 # -------------------Args------------------------
 args = {
     'owner': 'Moonlay',

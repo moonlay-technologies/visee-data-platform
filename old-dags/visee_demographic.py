@@ -28,12 +28,10 @@ env =  Variable.get("visee_credential", deserialize_json=True)
 aws_key_id = env["aws_key_id"]
 aws_secret_key = env["aws_secret_key"]
 aws_region_name = env["aws_region_name"]
-postgres_local = env["postgres_local_url"]
 postgres_visee = env["postgres_visee"]
 # job_args = Variable.get("", deserialize_json=True)
 table_name = 'raw_table'
 database_url=postgres_visee
-# database_url=postgres_local
 # -------------------Args------------------------
 args = {
     'owner': 'Moonlay',
