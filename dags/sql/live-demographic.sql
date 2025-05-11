@@ -25,7 +25,7 @@ GROUP BY
     vr.age,
     vr.store_id,
     vr.detection_type
-ON CONFLICT (client_id, zone_id, object_id, session_id, store_id, detection_type) 
+ON CONFLICT (client_id, zone_id, object_id, session_id, store_id) 
 DO UPDATE SET 
     record_time_end = EXCLUDED.record_time_end,
     avg_dwell_time = EXCLUDED.avg_dwell_time;
