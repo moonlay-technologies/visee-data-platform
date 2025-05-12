@@ -21,6 +21,7 @@ UNION ALL
 
 SELECT 
     client_id,
+    store_id,
     zone_id,
     min(recording_time) as record_time,
     max(recording_time) as record_time_end,
