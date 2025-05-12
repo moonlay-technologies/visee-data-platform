@@ -9,7 +9,8 @@ SELECT
     ROUND(AVG(male_count)) AS average,
     MODE() WITHIN GROUP (ORDER BY male_count) AS mode,
     'Male' AS gender,
-    MAX(male_count) AS max
+    MAX(male_count) AS max,
+    detection_type
 FROM viseetor_line vr
 GROUP BY 
     vr.client_id, 
@@ -29,7 +30,8 @@ SELECT
     ROUND(AVG(female_count)) AS average,
     MODE() WITHIN GROUP (ORDER BY female_count) AS mode,
     'Female' AS gender,
-    MAX(female_count) AS max
+    MAX(female_count) AS max,
+    detection_type
 FROM viseetor_line vr
 GROUP BY 
     vr.client_id, 
@@ -50,7 +52,8 @@ SELECT
     ROUND(AVG(visitor_count)) AS average,
     MODE() WITHIN GROUP (ORDER BY visitor_count) AS mode,
     'All' AS gender,
-    MAX(visitor_count) AS max
+    MAX(visitor_count) AS max,
+    detection_type
 FROM viseetor_line vr
 GROUP BY 
     vr.client_id, 
