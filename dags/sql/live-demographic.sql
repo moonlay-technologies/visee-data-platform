@@ -28,4 +28,9 @@ GROUP BY
 ON CONFLICT (client_id, zone_id, object_id, session_id, store_id) 
 DO UPDATE SET 
     record_time_end = EXCLUDED.record_time_end,
-    avg_dwell_time = EXCLUDED.avg_dwell_time;
+    avg_dwell_time = EXCLUDED.avg_dwell_time,
+    gender = EXCLUDED.gender,
+    emotion = EXCLUDED.emotion,
+    age = EXCLUDED.age,
+    activity = EXCLUDED.activity,
+    attributes = EXCLUDED.attributes;
