@@ -25,7 +25,7 @@ from botocore.exceptions import NoCredentialsError
 log = logging.getLogger(__name__)
 
 # -------------------Variables------------------------
-local_tz = pendulum.timezone("Asia/Jakarta")
+local_tz = pendulum.timezone("UTC")
 date_today = datetime.now()
 env =  Variable.get("visee_credential", deserialize_json=True)
 aws_key_id = env["aws_key_id"]
