@@ -70,7 +70,7 @@ def getTimeFilter(ti, **kwargs):
 
     formated_times = datetime.strptime(get_offset_time, "%Y-%m-%d %H:%M:%S.%f%z")
 
-    filter_start = (formated_times - timedelta(minutes=5)).replace(second=0, microsecond=1)
+    filter_start = (formated_times - timedelta(minutes=35)).replace(second=0, microsecond=1)
     filter_end = formated_times.replace(second=0, microsecond=0)
 
     ti.xcom_push(key='filter_start', value=filter_start.strftime("%Y-%m-%d %H:%M:%S%f%z")[:-2] + ':' + filter_start.strftime("%Y-%m-%d %H:%M:%S%f%z")[-2:])
