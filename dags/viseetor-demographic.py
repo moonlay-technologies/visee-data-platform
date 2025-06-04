@@ -125,7 +125,7 @@ def getDataDynamoDB(filter_start, filter_end, **kwargs):
         # Convert Data Type & Rename Columns
         df_raw['id'] = df_raw['id'].astype(str)
         df_raw['age'] = df_raw['age'].astype(str)
-        df_raw['attributes'] = df_raw['attributes'].astype(str)
+        df_raw['fashion_size'] = df_raw['fashion_size'].astype(str)
         df_raw['client_id'] = df_raw['client_id'].astype('int')
         df_raw['created_at'] = pd.to_datetime(df_raw['created_at'], utc=True, errors='coerce')
         df_raw['emotion'] = df_raw['emotion'].astype(str)
@@ -137,7 +137,7 @@ def getDataDynamoDB(filter_start, filter_end, **kwargs):
         df_raw['zone_id'] = df_raw['zone_id'].astype('int')
         df_raw['store_id'] = df_raw['store_id'].astype('int')
         df_raw['gender'] = df_raw['gender'].astype(str)
-        df_raw['activity'] = df_raw['activity'].astype(str)
+        df_raw['fashion_style'] = df_raw['fashion_style'].astype(str)
         df_raw['detection_type'] = df_raw['detection_type'].astype(str)
       
         log.info(f"Data types after convert: {df_raw.dtypes}")

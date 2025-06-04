@@ -11,8 +11,8 @@ WITH ranked_rows AS (
         vr.emotion,
         vr.age,
         vr.store_id,
-        vr.activity,
-        vr.attributes,
+        vr.fashion_style,
+        vr.fashion_size,
         vr.detection_type,
         ROW_NUMBER() OVER (
             PARTITION BY vr.client_id, vr.zone_id, vr.object_id, vr.session_id, vr.store_id
@@ -20,7 +20,7 @@ WITH ranked_rows AS (
         ) AS row_num
     FROM viseetor_raw vr
 )
-INSERT INTO live_demographic (record_time, record_time_end, avg_dwell_time, client_id, zone_id, object_id, session_id, gender, emotion, age, store_id, activity, attributes, detection_type)
+INSERT INTO live_demographic (record_time, record_time_end, avg_dwell_time, client_id, zone_id, object_id, session_id, gender, emotion, age, store_id, fashion_style, fashion_size, detection_type)
 SELECT 
     recording_time,
     recording_end,
@@ -33,8 +33,8 @@ SELECT
     emotion,
     age,
     store_id,
-    activity,
-    attributes,
+    fashion_style,
+    fashion_size,
     detection_type
 FROM ranked_rows
 WHERE row_num = 1
@@ -45,5 +45,5 @@ DO UPDATE SET
     gender = EXCLUDED.gender,
     emotion = EXCLUDED.emotion,
     age = EXCLUDED.age,
-    activity = EXCLUDED.activity,
-    attributes = EXCLUDED.attributes;
+    fashion_style = EXCLUDED.fashion_style,
+    fashion_size = EXCLUDED.fashion_size;
